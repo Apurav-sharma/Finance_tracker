@@ -1,101 +1,144 @@
-import Image from "next/image";
+"use client";
+
+import { useEffect, useState } from "react";
+import axios from "axios";
+import { Button } from "./components/ui/button";
+import { Input } from "./components/ui/input";
+import { useForm } from "react-hook-form";
+import Bchart from "./components/charts/barchart";
+import Pchart from "./components/charts/piechart";
+
+const CATEGORIES = ["Food", "Transport", "Entertainment", "Bills", "Shopping", "Other"];
+const COLORS = ["#FF6384", "#36A2EB", "#FFCE56", "#4CAF50", "#BA68C8", "#FF9800"];
+
+const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.js
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const { register, handleSubmit, reset } = useForm();
+  const [transactions, setTransactions] = useState([]);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  useEffect(() => {
+    fetchTransactions();
+  }, []);
+
+  const fetchTransactions = async () => {
+    const { data } = await axios.get("/api/transactions");
+    setTransactions(data);
+  };
+
+  const onSubmit = async (data) => {
+    const transaction = {
+      category: data.category,
+      amount: parseFloat(data.amount),
+      date: new Date(data.date).toISOString(),
+      description: data.description,
+    };
+    console.log(transaction);
+    await axios.post("/api/transactions", transaction);
+    fetchTransactions();
+    reset();
+  };
+
+  const deleteTransaction = async (id) => {
+    await axios.delete(`/api/transactions`, { data: { id } });
+    fetchTransactions();
+  };
+
+  const totalExpenses = transactions.reduce((sum, tx) => sum + tx.amount, 0);
+
+  const categoryData = CATEGORIES.map((category, index) => ({
+    name: category,
+    value: transactions.filter((tx) => tx.category === category).reduce((sum, tx) => sum + tx.amount, 0),
+    color: COLORS[index],
+  })).filter((item) => item.value > 0);
+
+
+  const monthlyCategoryData = months.map(item => {
+    const m = item;
+    const obj = transactions.reduce((sum, tx) => {
+      var month = new Date(tx.date).getMonth();
+      const monthName = months[month];
+      if (!sum[tx.category]) {
+        sum[tx.category] = 0;
+      }
+
+      if (monthName === m) {
+        sum[tx.category] += tx.amount;
+      }
+
+      return sum;
+    }, {})
+
+    return { month: m, categories: obj };
+  });
+
+  // console.log(monthlyCategoryData);
+
+
+  const monthlyExpenses = transactions.reduce((acc, tx) => {
+    const month = new Date(tx.date).getMonth();
+    let month2 = months[month];
+    acc[month2] = (acc[month2] || 0) + tx.amount;
+    return acc;
+  }, {});
+
+  console.log(transactions);
+  // console.log(monthlyExpenses);
+
+  const barChartData = Object.keys(monthlyExpenses).map((month) => ({
+    month,
+    amount: monthlyExpenses[month],
+  }));
+
+  return (
+    <div className="max-w-3xl mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-4">Transaction Tracker</h1>
+
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="p-4 bg-blue-500 text-white rounded-lg">
+          <h2 className="text-lg">Total Expenses</h2>
+          <p className="text-xl font-bold">${totalExpenses}</p>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+        <div className="p-4 bg-green-500 text-white rounded-lg">
+          <h2 className="text-lg">Transactions</h2>
+          <p className="text-xl font-bold">{transactions.length}</p>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-2">
+        <Input type="number" placeholder="Amount" {...register("amount", { required: true })} />
+        <Input type="date" {...register("date", { required: true })} />
+        <Input placeholder="Description" {...register("description", { required: true })} />
+        <select {...register("category", { required: true })} className="border rounded p-2 w-full">
+          <option value="">Select Category</option>
+          {CATEGORIES.map((category) => (
+            <option key={category} value={category}>
+              {category}
+            </option>
+          ))}
+        </select>
+        <Button type="submit">Add Transaction</Button>
+      </form>
+
+      {/* Transaction List */}
+      <ul className="mt-4 space-y-2">
+        {transactions.map((tx) => (
+          <li key={tx._id} className="flex justify-between p-2 bg-gray-100 rounded">
+            <span>
+              {tx.description} - ${tx.amount} ({tx.category})
+            </span>
+            <Button variant="destructive" onClick={() => deleteTransaction(tx._id)}>
+              Delete
+            </Button>
+          </li>
+        ))}
+      </ul>
+
+      <h2 className="text-xl font-bold mt-6">Monthly Expenses</h2>
+      <Bchart barChartData={barChartData} />
+
+      <h2 className="text-xl font-bold mt-6">Category-wise Expenses</h2>
+      <Pchart categoryData={categoryData} />
     </div>
   );
 }
